@@ -1,6 +1,5 @@
 name: CI/CD — Build, Test & Deploy
 
-# Déclencheurs du pipeline
 on:
   push:
     branches: [ main ]
@@ -8,9 +7,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-# Variables globales
 env:
-  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/spring-maven-homework
   JAVA_VERSION: '17'
   CONTAINER_NAME: spring-maven-app
   APP_PORT: '8080'
@@ -53,9 +50,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main'
-    outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
-      image-digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: 📥 Checkout du code
         uses: actions/checkout@v4
@@ -70,7 +64,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.DOCKER_IMAGE }}
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/spring-maven-homework
           tags: |
             type=sha,prefix=sha-
             type=raw,value=latest
@@ -102,7 +96,6 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment:
       name: production
-      url: http://${{ secrets.SERVER_HOST }}:${{ env.APP_PORT }}
     steps:
       - name: 🚀 Déploiement via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -115,31 +108,30 @@ jobs:
             echo '${{ secrets.DOCKERHUB_TOKEN }}' | \
             docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
 
-            docker stop ${{ env.CONTAINER_NAME }} 2>/dev/null || true
-            docker rm ${{ env.CONTAINER_NAME }} 2>/dev/null || true
+            docker stop spring-maven-app 2>/dev/null || true
+            docker rm spring-maven-app 2>/dev/null || true
 
-            docker pull ${{ env.DOCKER_IMAGE }}:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/spring-maven-homework:latest
 
             docker run -d \
-              --name ${{ env.CONTAINER_NAME }} \
+              --name spring-maven-app \
               --restart unless-stopped \
-              -p ${{ env.APP_PORT }}:8080 \
+              -p 8080:8080 \
               -e SPRING_PROFILES_ACTIVE=prod \
               -e SPRING_DATASOURCE_URL=${{ secrets.DB_URL }} \
               -e SPRING_DATASOURCE_USERNAME=${{ secrets.DB_USER }} \
               -e SPRING_DATASOURCE_PASSWORD=${{ secrets.DB_PASSWORD }} \
-              ${{ env.DOCKER_IMAGE }}:latest
+              ${{ secrets.DOCKERHUB_USERNAME }}/spring-maven-homework:latest
 
             docker image prune -f
             sleep 15
-            docker ps | grep ${{ env.CONTAINER_NAME }}
+            docker ps | grep spring-maven-app
             echo '✅ Déploiement réussi !'
 
       - name: 🔔 Notification de succès
         if: success()
         run: |
           echo '🎉 Application déployée avec succès !'
-          echo "Image: ${{ env.DOCKER_IMAGE }}:latest"
           echo "Commit: ${{ github.sha }}"
 
       - name: 🚨 Notification d'échec
