@@ -101,23 +101,33 @@ jobs:
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: 🚀 Pull et démarrage du conteneur
-        run: |
-          echo '${{ secrets.DOCKERHUB_TOKEN }}' | \
-          docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
+      - name: 🚀 Déploiement via SSH Pinggy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            echo '${{ secrets.DOCKERHUB_TOKEN }}' | \
+            docker login -u '${{ secrets.DOCKERHUB_USERNAME }}' --password-stdin
 
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/spring-maven-homework:latest
+            docker stop spring-maven-app 2>/dev/null || true
+            docker rm spring-maven-app 2>/dev/null || true
 
-          docker run -d \
-            --name spring-maven-app \
-            --restart unless-stopped \
-            -p 8080:8080 \
-            -e SPRING_PROFILES_ACTIVE=prod \
-            ${{ secrets.DOCKERHUB_USERNAME }}/spring-maven-homework:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/spring-maven-homework:latest
 
-          sleep 15
-          docker ps | grep spring-maven-app
-          echo '✅ Déploiement réussi !'
+            docker run -d \
+              --name spring-maven-app \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              ${{ secrets.DOCKERHUB_USERNAME }}/spring-maven-homework:latest
+
+            docker image prune -f
+            sleep 15
+            docker ps | grep spring-maven-app
+            echo '✅ Déploiement réussi !'
 
       - name: 🔔 Notification de succès
         if: success()
