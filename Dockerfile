@@ -2,7 +2,7 @@
 # STAGE 1 : BUILD
 # Utilise Maven + JDK pour compiler l'application
 # ==========================================================
-FROM maven:3.9-eclipse-temurin-17 AS builder
+FROM eclipse-temurin:17-jre-jammy AS runtime
 
 WORKDIR /app
 
